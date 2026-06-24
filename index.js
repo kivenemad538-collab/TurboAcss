@@ -8,7 +8,7 @@ const client = new Client({
 });
 
 const BOARDING_ROLE_ID = '1516991167982735451';
-const HIDE_COMMUNITY_ROLE_ID = 1516991502839054378';
+const HIDE_COMMUNITY_ROLE_ID = '1516991502839054378';
 
 client.on('guildMemberUpdate', async (oldMember, newMember) => {
   const hasBoarding = newMember.roles.cache.has(BOARDING_ROLE_ID);
