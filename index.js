@@ -41,7 +41,7 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 });
 
 client.once('ready', () => {
-  console.log(${client.user.tag} Online);
+  console.log('${client.user.tag} Online');
 });
 
 client.login(process.env.TOKEN);
