@@ -186,7 +186,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 
   const modal = new ModalBuilder()
-    .setCustomId(modal_${interaction.customId})
+    .setCustomId('modal_${interaction.customId}')
     .setTitle("إضافة صلاحية لشخص");
 
   const userIdInput = new TextInputBuilder()
