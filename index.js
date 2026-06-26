@@ -60,7 +60,7 @@ const panelButtons = new ActionRowBuilder().addComponents(
 );
 
 client.once(Events.ClientReady, async () => {
-  console.log(✅ Logged in as ${client.user.tag});
+  console.log('✅ Logged in as ${client.user.tag}');
 
   try {
     const guild = await client.guilds.fetch(GUILD_ID);
