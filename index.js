@@ -17,8 +17,8 @@ require("dotenv").config();
 const TOKEN = process.env.TOKEN;
 
 // IDs
-const GUILD_ID = "PUT_SERVER_ID";
-const PANEL_CHANNEL_ID = "PUT_PANEL_CHANNEL_ID";
+const GUILD_ID = "1492895005725954159";
+const PANEL_CHANNEL_ID = "1517218130768957510";
 
 // الرولات
 const APPLICATION_TEAM_ROLE_ID = "1516990519232827412";
