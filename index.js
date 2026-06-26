@@ -264,7 +264,7 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
 
   try {
     await removeAccess(newMember.guild, newMember.id);
-    console.log(✅ Removed access from ${newMember.user.tag});
+    console.log('✅ Removed access from ${newMember.user.tag}');
   } catch (err) {
     console.error("Remove Access Error:", err);
   }
