@@ -232,7 +232,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     await giveAccess(guild, member, roleId);
 
     return interaction.reply({
-      content: ✅ تم إعطاء ${member.user.tag} رول ${roleName} والأكسس.,
+      content: '✅ تم إعطاء ${member.user.tag} رول ${roleName} والأكسس.',
       ephemeral: true
     });
   } catch (err) {
