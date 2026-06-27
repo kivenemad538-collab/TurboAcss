@@ -10,17 +10,14 @@ const TOKEN = process.env.TOKEN;
 
 // IDs
 const GUILD_ID = "1492895005725954159";
+const PANEL_CHANNEL_ID = "1517218130768957510";
 
-// رولات فريق التقديمات
+// الرولات
 const APPLICATION_TEAM_ROLE_ID = "1516990519232827412";
 const APPLICATION_MANAGER_ROLE_ID = "1520110954296250650";
 
-// رول المجتمع وتصريح الدخول
-const COMMUNITY_ROLE_ID = "1516991502839054378";
-const ENTRY_PERMISSION_ROLE_ID = "1516991167982735451";
-
-// أول اتنين Text Channels والتالت Voice Channel
-const TEXT_CHANNEL_IDS = [
+// الرومات اللي البوت يدي عليها أكسس
+const ACCESS_CHANNEL_IDS = [
   "1517157325125976235",
   "1517157396407914686"
 ];
