@@ -1,15 +1,7 @@
 const {
   Client,
   GatewayIntentBits,
-  Events,
-  EmbedBuilder,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  ModalBuilder,
-  TextInputBuilder,
-  TextInputStyle,
-  PermissionsBitField
+  Events
 } = require("discord.js");
 
 require("dotenv").config();
@@ -18,11 +10,14 @@ const TOKEN = process.env.TOKEN;
 
 // IDs
 const GUILD_ID = "1492895005725954159";
-const PANEL_CHANNEL_ID = "1517218130768957510";
 
-// الرولات
+// رولات فريق التقديمات
 const APPLICATION_TEAM_ROLE_ID = "1516990519232827412";
 const APPLICATION_MANAGER_ROLE_ID = "1520110954296250650";
+
+// حط هنا رول المجتمع وتصريح الدخول
+const COMMUNITY_ROLE_ID = "1516991502839054378";
+const ENTRY_PERMISSION_ROLE_ID = "1516991167982735451";
 
 // أول اتنين Text Channels
 const TEXT_CHANNEL_IDS = [
@@ -33,9 +28,9 @@ const TEXT_CHANNEL_IDS = [
 // التالت Voice Channel
 const VOICE_CHANNEL_ID = "1517157524212682833";
 
-// مين يقدر يستخدم البانل
-const ALLOWED_ADMIN_ROLES = [
-  APPLICATION_MANAGER_ROLE_ID
+const ALL_CHANNEL_IDS = [
+  ...TEXT_CHANNEL_IDS,
+  VOICE_CHANNEL_ID
 ];
 
 const client = new Client({
@@ -45,42 +40,23 @@ const client = new Client({
   ]
 });
 
-const panelButtons = new ActionRowBuilder().addComponents(
-  new ButtonBuilder()
-    .setCustomId("add_application_team")
-    .setLabel("فريق التقديمات")
-    .setEmoji("👥")
-    .setStyle(ButtonStyle.Primary),
+function hasApplicationAccess(member) {
+  return (
+    member.roles.cache.has(APPLICATION_TEAM_ROLE_ID) ||
+    member.roles.cache.has(APPLICATION_MANAGER_ROLE_ID)
+  );
+}
 
-  new ButtonBuilder()
-    .setCustomId("add_application_manager")
-    .setLabel("مسؤول التقديمات")
-    .setEmoji("🛡️")
-    .setStyle(ButtonStyle.Danger)
-);
+function isApplicationManager(member) {
+  return member.roles.cache.has(APPLICATION_MANAGER_ROLE_ID);
+}
 
-client.once(Events.ClientReady, async () => {
-  console.log('✅ Logged in as ${client.user.tag}');
-
-  try {
-    const guild = await client.guilds.fetch(GUILD_ID);
-    const channel = await guild.channels.fetch(PANEL_CHANNEL_ID);
-
-    const embed = new EmbedBuilder()
-      .setColor("Red")
-      .setTitle("لوحة صلاحيات التقديمات")
-      .setDescription("اختار الرتبة، وبعدها اكتب ID الشخص.");
-
-    await channel.send({
-      embeds: [embed],
-      components: [panelButtons]
-    });
-
-    console.log("✅ Panel sent");
-  } catch (err) {
-    console.error("Panel Error:", err);
-  }
-});
+function hasCommunityAndEntry(member) {
+  return (
+    member.roles.cache.has(COMMUNITY_ROLE_ID) &&
+    member.roles.cache.has(ENTRY_PERMISSION_ROLE_ID)
+  );
+}
 
 function teamTextPermissions() {
   return {
@@ -118,7 +94,9 @@ function teamVoicePermissions() {
     Connect: true,
     Speak: true,
     Stream: true,
-    UseVAD: true
+    UseVAD: true,
+    UseSoundboard: true,
+    UseExternalSounds: true
   };
 }
 
@@ -129,144 +107,144 @@ function managerVoicePermissions() {
     Speak: true,
     Stream: true,
     UseVAD: true,
+    UseSoundboard: true,
+    UseExternalSounds: true,
+    PrioritySpeaker: true,
     MuteMembers: true,
     DeafenMembers: true,
     MoveMembers: true,
-    PrioritySpeaker: true
+    ManageEvents: true
   };
 }
 
-async function giveAccess(guild, member, roleId) {
-  const isManager = roleId === APPLICATION_MANAGER_ROLE_ID;
-
-  for (const channelId of TEXT_CHANNEL_IDS) {
+async function fetchChannel(guild, channelId) {
+  try {
     const channel = await guild.channels.fetch(channelId);
 
-    await channel.permissionOverwrites.edit(member.id, isManager
-      ? managerTextPermissions()
-      : teamTextPermissions()
+    if (!channel) {
+      console.log(`❌ الروم مش موجود: ${channelId}`);
+      return null;
+    }
+
+    return channel;
+  } catch (err) {
+    console.log(`❌ مش عارف أجيب الروم: ${channelId}`);
+    console.error(err);
+    return null;
+  }
+}
+
+async function deleteOverwrite(channel, memberId) {
+  const overwrite = channel.permissionOverwrites.cache.get(memberId);
+
+  if (overwrite) {
+    await channel.permissionOverwrites.delete(memberId).catch(() => {});
+  }
+}
+
+async function giveApplicationAccess(member) {
+  const manager = isApplicationManager(member);
+
+  for (const channelId of TEXT_CHANNEL_IDS) {
+    const channel = await fetchChannel(member.guild, channelId);
+    if (!channel) continue;
+
+    await channel.permissionOverwrites.edit(
+      member.id,
+      manager ? managerTextPermissions() : teamTextPermissions()
     );
   }
 
-  const voiceChannel = await guild.channels.fetch(VOICE_CHANNEL_ID);
+  const voiceChannel = await fetchChannel(member.guild, VOICE_CHANNEL_ID);
+  if (!voiceChannel) return;
 
-  await voiceChannel.permissionOverwrites.edit(member.id, isManager
-    ? managerVoicePermissions()
-    : teamVoicePermissions()
+  await voiceChannel.permissionOverwrites.edit(
+    member.id,
+    manager ? managerVoicePermissions() : teamVoicePermissions()
   );
 }
 
-async function removeAccess(guild, memberId) {
-  for (const channelId of TEXT_CHANNEL_IDS) {
-    const channel = await guild.channels.fetch(channelId);
-    await channel.permissionOverwrites.delete(memberId).catch(() => {});
-  }
+async function blockCommunityEntry(member) {
+  for (const channelId of ALL_CHANNEL_IDS) {
+    const channel = await fetchChannel(member.guild, channelId);
+    if (!channel) continue;
 
-  const voiceChannel = await guild.channels.fetch(VOICE_CHANNEL_ID);
-  await voiceChannel.permissionOverwrites.delete(memberId).catch(() => {});
+    await channel.permissionOverwrites.edit(member.id, {
+      ViewChannel: false
+    });
+  }
 }
 
-client.on(Events.InteractionCreate, async (interaction) => {
-  if (!interaction.isButton()) return;
+async function clearAccess(member) {
+  for (const channelId of ALL_CHANNEL_IDS) {
+    const channel = await fetchChannel(member.guild, channelId);
+    if (!channel) continue;
 
-  if (
-    interaction.customId !== "add_application_team" &&
-    interaction.customId !== "add_application_manager"
-  ) return;
+    await deleteOverwrite(channel, member.id);
+  }
+}
 
-  const hasPermission =
-    interaction.member.permissions.has(PermissionsBitField.Flags.Administrator) ||
-    interaction.member.roles.cache.some(role => ALLOWED_ADMIN_ROLES.includes(role.id));
+async function updateMemberAccess(member) {
+  if (!member || member.user.bot) return;
 
-  if (!hasPermission) {
-    return interaction.reply({
-      content: "❌ ليس لديك صلاحية لاستخدام البانل.",
-      ephemeral: true
-    });
+  const applicationAccess = hasApplicationAccess(member);
+  const communityAndEntry = hasCommunityAndEntry(member);
+
+  // فريق التقديمات يشوف الرومات مهما كان معاه رولات تانية
+  if (applicationAccess) {
+    await giveApplicationAccess(member);
+    return;
   }
 
-  const modal = new ModalBuilder()
-    .setCustomId('modal_${interaction.customId}')
-    .setTitle("إضافة صلاحية لشخص");
-
-  const userIdInput = new TextInputBuilder()
-    .setCustomId("user_id")
-    .setLabel("حط ID الشخص هنا")
-    .setStyle(TextInputStyle.Short)
-    .setRequired(true);
-
-  const row = new ActionRowBuilder().addComponents(userIdInput);
-  modal.addComponents(row);
-
-  await interaction.showModal(modal);
-});
-
-client.on(Events.InteractionCreate, async (interaction) => {
-  if (!interaction.isModalSubmit()) return;
-  if (!interaction.customId.startsWith("modal_")) return;
-
-  const userId = interaction.fields.getTextInputValue("user_id").trim();
-  const type = interaction.customId.replace("modal_", "");
-
-  let roleId;
-  let roleName;
-
-  if (type === "add_application_team") {
-    roleId = APPLICATION_TEAM_ROLE_ID;
-    roleName = "فريق التقديمات";
-  } else if (type === "add_application_manager") {
-    roleId = APPLICATION_MANAGER_ROLE_ID;
-    roleName = "مسؤول التقديمات";
-  } else {
-    return interaction.reply({
-      content: "❌ نوع الزر غير معروف.",
-      ephemeral: true
-    });
+  // اللي معاه رول المجتمع + تصريح الدخول ميشوفش الرومات المحددة
+  if (communityAndEntry) {
+    await blockCommunityEntry(member);
+    return;
   }
+
+  // لو مش معاه حاجة من دول، امسح الأوفررايد الشخصي
+  await clearAccess(member);
+}
+
+client.once(Events.ClientReady, async () => {
+  console.log(`✅ Logged in as ${client.user.tag}`);
 
   try {
     const guild = await client.guilds.fetch(GUILD_ID);
-    const member = await guild.members.fetch(userId);
 
-    await member.roles.add(roleId);
-    await giveAccess(guild, member, roleId);
+    console.log("🔄 Checking all members...");
 
-    return interaction.reply({
-      content: ✅ تم إعطاء ${member.user.tag} رول ${roleName} والأكسس.,
-      ephemeral: true
-    });
+    await guild.members.fetch();
+
+    for (const member of guild.members.cache.values()) {
+      await updateMemberAccess(member);
+    }
+
+    console.log("✅ Done checking all members");
   } catch (err) {
-    console.error("Give Access Error:", err);
-
-    return interaction.reply({
-      content: "❌ حصل خطأ. اتأكد إن ID الشخص صحيح، وإن رول البوت أعلى من الرولات، وإن عنده Manage Roles و Manage Channels.",
-      ephemeral: true
-    });
+    console.error("Startup Error:", err);
   }
 });
 
 client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
-  const removedTeam =
-    oldMember.roles.cache.has(APPLICATION_TEAM_ROLE_ID) &&
-    !newMember.roles.cache.has(APPLICATION_TEAM_ROLE_ID);
+  const watchedRoles = [
+    APPLICATION_TEAM_ROLE_ID,
+    APPLICATION_MANAGER_ROLE_ID,
+    COMMUNITY_ROLE_ID,
+    ENTRY_PERMISSION_ROLE_ID
+  ];
 
-  const removedManager =
-    oldMember.roles.cache.has(APPLICATION_MANAGER_ROLE_ID) &&
-    !newMember.roles.cache.has(APPLICATION_MANAGER_ROLE_ID);
+  const changed = watchedRoles.some(roleId =>
+    oldMember.roles.cache.has(roleId) !== newMember.roles.cache.has(roleId)
+  );
 
-  if (!removedTeam && !removedManager) return;
-
-  const stillHasAnyAccessRole =
-    newMember.roles.cache.has(APPLICATION_TEAM_ROLE_ID) ||
-    newMember.roles.cache.has(APPLICATION_MANAGER_ROLE_ID);
-
-  if (stillHasAnyAccessRole) return;
+  if (!changed) return;
 
   try {
-    await removeAccess(newMember.guild, newMember.id);
-    console.log(✅ Removed access from ${newMember.user.tag});
+    await updateMemberAccess(newMember);
+    console.log(`✅ Updated access for ${newMember.user.tag}`);
   } catch (err) {
-    console.error("Remove Access Error:", err);
+    console.error(`❌ Error updating ${newMember.user.tag}:`, err);
   }
 });
 
